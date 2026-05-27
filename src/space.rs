@@ -73,7 +73,7 @@ impl From<Vec<i32>> for EdgeSignature {
 }
 
 impl EdgeSignature {
-    fn update(&self, other: &EdgeSignature) -> EdgeSignature {
+    fn add(&self, other: &EdgeSignature) -> EdgeSignature {
         EdgeSignature {
             inner: self
                 .inner
@@ -83,9 +83,16 @@ impl EdgeSignature {
                 .collect_vec(),
         }
     }
+
+    fn update(&mut self, other: &EdgeSignature) {
+        self.inner
+            .iter_mut()
+            .zip(&other.inner)
+            .for_each(|(s, o)| *s = (*s + *o) % 2);
+    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ThresholdedSpace {
     inner: Grid<bool>,
     obstacles: Vec<Coord>,
@@ -127,6 +134,13 @@ impl ThresholdedSpace {
             .get(&edge)
             .unwrap_or(&self.default_signature)
             .clone()
+    }
+
+    pub fn possible_signatures(&self) -> impl Iterator<Item = EdgeSignature> {
+        (0..self.default_signature.inner.len())
+            .map(|_| 0..2)
+            .multi_cartesian_product()
+            .map(|v| v.into())
     }
 
     pub fn from_probability_map(prob_map: &ProbabilityMap, threshold: f32) -> Self {
@@ -225,10 +239,12 @@ impl ThresholdedSpace {
         let goal = goal.into();
         let sig = sig.into();
 
-        let h = |c: &CoordSig| {
-            let (row_d, col_d) = goal.diff(&c.c);
-            ((row_d * row_d + col_d * col_d) as f32).sqrt()
-        };
+        if !self.inner.in_bounds(start) || !self.inner.in_bounds(goal) {
+            return None;
+        }
+
+        // Heuristic function is the euclidean distance
+        let h = |c: &CoordSig| goal.distance(&c.c);
         let mut came_from: HashMap<CoordSig, CoordSig> = HashMap::new();
         let mut g_score: HashMap<CoordSig, i32> = HashMap::new();
         let mut f_score: HashMap<CoordSig, f32> = HashMap::new();
@@ -278,7 +294,7 @@ impl ThresholdedSpace {
             let cur_loc = current.c;
             for neighbor in self.inner.filter_neighbors(cur_loc, |&b| b) {
                 let edge_delta = BiEdge::new(cur_loc, neighbor);
-                let new_sig = current.s.update(&self.sig(edge_delta));
+                let new_sig = current.s.add(&self.sig(edge_delta));
                 let neighbor = CoordSig {
                     c: neighbor,
                     s: new_sig,
@@ -298,6 +314,23 @@ impl ThresholdedSpace {
         }
 
         None
+    }
+
+    // Project a path of coordinates into the space and return the cummulative signature
+    pub fn project_path(&self, path: &[Coord]) -> Option<EdgeSignature> {
+        let mut sig = self.default_signature.clone();
+        for (c1, c2) in path.into_iter().tuple_windows() {
+            // Check if all coordinates are in bounds and traversable
+            if !self.inner.in_bounds(*c1)
+                || !self.inner.in_bounds(*c2)
+                || !self.inner[*c1]
+                || !self.inner[*c2]
+            {
+                return None;
+            }
+            sig.update(&self.sig(BiEdge { inner: (*c1, *c2) }));
+        }
+        Some(sig)
     }
 
     pub fn print_with_path(&self, path: &[Coord]) {

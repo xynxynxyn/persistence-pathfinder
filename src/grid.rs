@@ -5,7 +5,7 @@ use std::{
 
 use itertools::Itertools;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Grid<T> {
     inner: Vec<T>,
     rows: usize,
@@ -28,6 +28,11 @@ impl Coord {
             self.row as i64 - other.row as i64,
             self.col as i64 - other.col as i64,
         )
+    }
+
+    pub fn distance(&self, other: &Coord) -> f32 {
+        let (x, y) = self.diff(other);
+        ((x * x + y * y) as f32).sqrt()
     }
 }
 
