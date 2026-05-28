@@ -134,44 +134,47 @@ impl Solver {
             let mut new_open_classes: Vec<Vec<(f32, Path)>> = vec![];
             // Go over each signature and do the respective action
             for (sig, mergers) in projections {
-                let new_path = paths[&sig].clone();
-                match mergers.len() {
-                    // New pathclass, 0 paths from the prev tspace mapped to this one
-                    0 => {
-                        new_open_classes.push(vec![(*e, new_path)]);
-                    }
-
-                    // 1to1 mapping, simply extend the existing pathclass
-                    1 => {
-                        let mut class = open_classes[mergers[0]].clone();
-                        class.push((*e, new_path));
-                        new_open_classes.push(class);
-                    }
-
-                    // Merger, determine hausdorff distance to see which pathclass remains
-                    // Close the other candidates
-                    _ => {
-                        let mut best_index = 0;
-                        let mut best = INFINITY;
-                        for &m in &mergers {
-                            let candidate_path =
-                                open_classes[m].last().expect("empty path class").1.clone();
-                            let h = hausdorff(&new_path, &candidate_path);
-                            if h < best {
-                                best = h;
-                                best_index = m;
-                            }
+                // If no path exists for that signature it is not a possible path
+                // For example an obstacle is next to a boundary making it impossible to go around
+                if let Some(new_path) = paths.get(&sig).cloned() {
+                    match mergers.len() {
+                        // New pathclass, 0 paths from the prev tspace mapped to this one
+                        0 => {
+                            new_open_classes.push(vec![(*e, new_path)]);
                         }
-                        // Found the best path, extend the path class with it and close all others
-                        let mut class = open_classes[best_index].clone();
-                        class.push((*e, new_path));
-                        new_open_classes.push(class);
-                        for &m in mergers
-                            .iter()
-                            .enumerate()
-                            .filter_map(|(i, e)| if i == best_index { None } else { Some(e) })
-                        {
-                            barcode.close_path_class(open_classes[m].clone());
+
+                        // 1to1 mapping, simply extend the existing pathclass
+                        1 => {
+                            let mut class = open_classes[mergers[0]].clone();
+                            class.push((*e, new_path));
+                            new_open_classes.push(class);
+                        }
+
+                        // Merger, determine hausdorff distance to see which pathclass remains
+                        // Close the other candidates
+                        _ => {
+                            let mut best_index = 0;
+                            let mut best = INFINITY;
+                            for &m in &mergers {
+                                let candidate_path =
+                                    open_classes[m].last().expect("empty path class").1.clone();
+                                let h = hausdorff(&new_path, &candidate_path);
+                                if h < best {
+                                    best = h;
+                                    best_index = m;
+                                }
+                            }
+                            // Found the best path, extend the path class with it and close all others
+                            let mut class = open_classes[best_index].clone();
+                            class.push((*e, new_path));
+                            new_open_classes.push(class);
+                            for &m in mergers
+                                .iter()
+                                .enumerate()
+                                .filter_map(|(i, e)| if i == best_index { None } else { Some(e) })
+                            {
+                                barcode.close_path_class(open_classes[m].clone());
+                            }
                         }
                     }
                 }

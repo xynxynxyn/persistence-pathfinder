@@ -12,9 +12,12 @@ mod space;
 
 fn main() -> Result<()> {
     let mut pmap = ProbabilityMap::empty(5, 5);
-    pmap.update((1, 1), 0.3)?;
-    pmap.update((1, 2), 0.5)?;
-    pmap.update((3, 3), 0.9)?;
+    //pmap.update((1, 1), 0.3)?;
+    //pmap.update((1, 2), 0.5)?;
+    //pmap.update((3, 3), 0.9)?;
+    pmap.update((1,1), 0.9)?;
+    pmap.update((1,2), 0.5)?;
+    pmap.update((1,3), 0.9)?;
 
     let solver = Solver::builder()
         .pmap(pmap)
